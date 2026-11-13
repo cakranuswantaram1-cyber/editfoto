@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Editor Foto Pro</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#7c3aed">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Editor Foto">
+    <link rel="icon" href="icons/icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="icons/icon-180.png">
+
+    <!-- Font & ikon -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Tailwind CDN + SweetAlert2 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+
+    <script>
+        // Warna aksen dikendalikan variabel CSS (--a400..--a700) supaya mudah diganti satu tempat.
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: {
+                fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
+                colors: { accent: {
+                    400: 'rgb(var(--a400) / <alpha-value>)',
+                    500: 'rgb(var(--a500) / <alpha-value>)',
+                    600: 'rgb(var(--a600) / <alpha-value>)',
+                    700: 'rgb(var(--a700) / <alpha-value>)'
+                } }
+            } }
+        }
+    </script>
+
+    <style>
+        :root { --a400: 167 139 250; --a500: 139 92 246; --a600: 124 58 237; --a700: 109 40 217; }
+        html, body { height: 100%; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0b1329; color: #f8fafc;
+               padding-top: env(safe-area-inset-top); -webkit-tap-highlight-color: transparent; }
+        .sidebar-active { background: linear-gradient(135deg, rgb(var(--a600)) 0%, rgb(var(--a500)) 100%);
+                          color: #fff !important; box-shadow: 0 10px 15px -3px rgb(var(--a500) / .4); }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .modal-enter { animation: modalFadeIn .25s cubic-bezier(.4,0,.2,1); }
+        @keyframes modalFadeIn { from { opacity: 0; transform: scale(.97) translateY(5px); } to { opacity: 1; transform: none; } }
+        .tab-enter { animation: tabIn .25s ease-out; }
+        @keyframes tabIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        #splash-screen { transition: opacity .5s ease-out, visibility .5s; }
+        .fade-out { opacity: 0; visibility: hidden; }
+        .swal2-popup { background: #1e293b !important; color: #f8fafc !important; border: 1px solid #334155; }
+        .swal2-title, .swal2-html-container { color: #f8fafc !important; }
+        .field { width: 100%; background: #020617; border: 1px solid #334155; border-radius: .5rem; padding: .6rem .75rem; font-size: .8rem; color: #f1f5f9; outline: none; }
+        .bt { background: linear-gradient(to right, rgb(var(--a600)), rgb(var(--a500))); color: #fff; font-weight: 700; font-size: .75rem; padding: .6rem .9rem; border-radius: .75rem; min-height: 40px; box-shadow: 0 8px 14px -6px rgb(var(--a500) / .5); transition: filter .15s; }
+        .bt:hover { filter: brightness(1.1); }
+        .bs { background: #1e293b; color: #e2e8f0; font-weight: 700; font-size: .75rem; padding: .6rem .9rem; border-radius: .75rem; min-height: 40px; transition: background .15s; }
+        .bs:hover { background: #334155; }
+        html, body, main { overflow-x: hidden; max-width: 100vw; }
+        #stage { height: min(46vh, 520px); }
+        @media (min-width: 1024px) { #stage { height: min(70vh, 640px); } }
+        .field, select, textarea { max-width: 100%; min-width: 0; }
+        button:disabled { opacity: .35; pointer-events: none; }
+        .field:focus { border-color: rgb(var(--a500)); box-shadow: 0 0 0 3px rgb(var(--a500) / .2); }
+        /* Sidebar: geser masuk di HP, tetap tampil di layar lebar */
+        #sidebar { width: 16rem; }
+        @media (max-width: 767px) {
+            #sidebar { position: fixed; top: 0; bottom: 0; left: 0; transform: translateX(-100%); transition: transform .25s ease; }
+            #sidebar.open { transform: none; }
+        }
+        @media print { #sidebar, header, #splash-screen, .no-print { display: none !important; } body { background: #fff; color: #000; } }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Splash screen -->
+    <div id="splash-screen" class="fixed inset-0 bg-[#0f172a] z-[9999] flex flex-col items-center justify-center">
+        <div class="w-20 h-20 bg-gradient-to-br from-accent-500 to-accent-700 rounded-2xl flex items-center justify-center text-white shadow-2xl animate-bounce mb-6">
+            <i class="fas fa-wand-magic-sparkles text-4xl"></i>
+        </div>
+        <h1 class="text-3xl font-black text-white tracking-tight mb-2">Editor Foto</h1>
+        <p class="text-slate-400 text-sm font-medium tracking-wide">Memuat data...</p>
+        <div class="w-48 h-1 bg-slate-800 rounded-full mt-6 overflow-hidden"><div class="h-full bg-accent-500 animate-pulse w-full"></div></div>
+    </div>
+
+    <div class="h-[100dvh] flex flex-col overflow-hidden">
+        <div class="flex-1 flex overflow-hidden relative">
+            <div id="sidebar-overlay" class="fixed inset-0 bg-slate-950/80 z-[50] hidden" onclick="toggleSidebar()"></div>
+
+            <!-- Sidebar -->
+            <aside id="sidebar" class="bg-slate-900 border-r border-slate-800 flex flex-col z-[60]">
+                <div class="p-4 border-b border-slate-800 flex flex-col gap-3 relative shrink-0">
+                    <button onclick="toggleSidebar()" class="md:hidden absolute top-4 right-4 text-slate-400 hover:text-red-400"><i class="fas fa-times text-xl"></i></button>
+                    <div class="w-10 h-10 bg-gradient-to-br from-accent-500 to-accent-700 rounded-xl flex items-center justify-center text-white shadow-lg mx-auto">
+                        <i class="fas fa-wand-magic-sparkles text-xl"></i>
+                    </div>
+                    <div class="text-center">
+                        <h1 id="side-nama" class="font-black text-[13px] text-slate-100 tracking-tight leading-tight">Memuat...</h1>
+                        <p class="text-[9px] font-bold text-accent-400 mt-1 uppercase">Studio Edit Gambar</p>
+                    </div>
+                </div>
+                <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto pb-24 text-[13px]">
+                    <!-- MENU:BEGIN (satu tombol per tab; id harus "btn-<tab>") -->
+                    <button onclick="switchTab('dashboard')" id="btn-dashboard" class="nav-link w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-slate-400 hover:bg-slate-800 hover:text-accent-400 transition"><i class="fas fa-chart-pie w-5 text-center"></i><span>Dashboard</span></button>
+                    <button onclick="switchTab('editor')" id="btn-editor" class="nav-link w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-slate-400 hover:bg-slate-800 hover:text-accent-400 transition"><i class="fas fa-pen-ruler w-5 text-center"></i><span>Editor Gambar</span></button>
+                    <button onclick="switchTab('proyek')" id="btn-proyek" class="nav-link w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-slate-400 hover:bg-slate-800 hover:text-accent-400 transition"><i class="fas fa-folder-tree w-5 text-center"></i><span>Proyek Saya</span></button>
+                    <div class="my-2 border-t border-slate-800"></div>
+                    <div class="px-3 py-1 text-[10px] uppercase font-black text-slate-600 tracking-wider">Sistem</div>
+                    <button onclick="switchTab('pengaturan')" id="btn-pengaturan" class="nav-link w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-slate-400 hover:bg-slate-800 hover:text-accent-400 transition"><i class="fas fa-gear w-5 text-center"></i><span>Pengaturan</span></button>
+                    <!-- MENU:END -->
+                </nav>
+            </aside>
+
+            <!-- Konten -->
+            <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-gradient-to-br from-[#0f172a] to-[#0b1329]">
+                <header class="bg-slate-900 px-4 py-3 flex items-center justify-between z-10 shadow-sm border-b border-slate-800 shrink-0">
+                    <div class="flex items-center gap-3">
+                        <button onclick="toggleSidebar()" class="md:hidden text-slate-300 hover:text-accent-400 bg-slate-800 hover:bg-slate-700 p-2 rounded-lg transition"><i class="fas fa-bars text-base"></i></button>
+                        <h2 id="header-title" class="text-sm font-bold text-slate-100">Dashboard</h2>
+                    </div>
+                    <div class="flex gap-3 items-center">
+                        <span id="net-badge" class="hidden text-[10px] font-bold px-2 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30"><i class="fas fa-wifi mr-1"></i>Offline</span>
+                        <div class="bg-slate-950/80 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-inner">
+                            <div class="w-1.5 h-1.5 rounded-full bg-accent-500"></div>
+                            <span id="live-clock" class="text-[11px] font-bold text-slate-200 font-mono tracking-wide">00:00:00</span>
+                        </div>
+                    </div>
+                </header>
+
+                <main class="flex-1 p-4 md:p-6 overflow-y-auto space-y-6 pb-32" style="padding-bottom: calc(8rem + env(safe-area-inset-bottom))">
+                    <!-- TAB:BEGIN (satu <section> per tab; id harus "tab-<tab>-view") -->
+
+                    <section id="tab-dashboard-view" class="tab-content hidden space-y-6">
+                        <div class="bg-gradient-to-r from-accent-700/60 via-slate-900 to-slate-900 rounded-2xl p-6 border border-slate-800 shadow-xl">
+                            <h3 class="text-2xl font-black text-white" id="dash-title">Selamat Datang</h3>
+                            <p class="text-slate-400 text-sm mt-1">Editor gambar lengkap di browser: potong, filter, teks, gambar tangan, dan ekspor.</p>
+                        </div>
+                        <div id="backup-reminder" class="hidden bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs rounded-xl p-3 flex items-center gap-3">
+                            <i class="fas fa-triangle-exclamation"></i>
+                            <span class="flex-1">Data tersimpan hanya di perangkat ini. Lakukan backup berkala.</span>
+                            <button onclick="switchTab('pengaturan')" class="font-bold underline">Backup</button>
+                        </div>
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="dash-stats"></div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+<button onclick="switchTab('editor');$('file-in').click()" class="bg-slate-900 border border-slate-800 hover:border-accent-500 rounded-2xl p-5 text-left transition hover:-translate-y-0.5"><i class="fas fa-folder-open text-accent-400 text-xl mb-3"></i><p class="font-bold text-sm">Buka Gambar</p><p class="text-[11px] text-slate-400 mt-1">Dari galeri atau berkas. Bisa juga seret atau tempel (Ctrl+V).</p></button>
+<button onclick="kanvasBaru()" class="bg-slate-900 border border-slate-800 hover:border-accent-500 rounded-2xl p-5 text-left transition hover:-translate-y-0.5"><i class="fas fa-square-plus text-accent-400 text-xl mb-3"></i><p class="font-bold text-sm">Kanvas Kosong</p><p class="text-[11px] text-slate-400 mt-1">Mulai dari kanvas polos dengan ukuran dan warna pilihan.</p></button>
+</div>
+<div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 text-[12px] text-slate-400 space-y-1.5">
+<h3 class="text-sm font-bold text-slate-100 mb-2"><i class="fas fa-list-check text-accent-400 mr-2"></i>Fitur Editor</h3>
+<p><b class="text-slate-200">Sesuaikan:</b> kecerahan, kontras, saturasi, rona, sepia, abu-abu, negatif, blur.</p>
+<p><b class="text-slate-200">Filter:</b> 11 preset siap pakai.</p>
+<p><b class="text-slate-200">Ubah:</b> putar, balik, potong (bebas/rasio), ubah ukuran.</p>
+<p><b class="text-slate-200">Gambar:</b> kuas, penghapus, warna, ukuran, opasitas.</p>
+<p><b class="text-slate-200">Bentuk &amp; Stiker:</b> garis, panah, kotak, oval, 24 emoji.</p>
+<p><b class="text-slate-200">Teks &amp; Bingkai:</b> font, bayangan, rotasi, bingkai warna, sudut membulat/lingkaran.</p>
+<p><b class="text-slate-200">Latar:</b> hapus latar dengan sekali ketuk atau otomatis, lalu ganti warna (merah/biru pas foto, dll).</p>
+<p><b class="text-slate-200">Efek:</b> vinyet, pertajam, grain, pixelate/sensor area.</p>
+<p><b class="text-slate-200">Ukuran siap pakai:</b> IG, Story, HD, profil, pas foto 3×4.</p>
+<p><b class="text-slate-200">Proyek Saya:</b> simpan dan lanjutkan editan kapan saja.</p>
+<p><b class="text-slate-200">Ekspor:</b> unduh, bagikan, atau salin; PNG, JPG, WebP. Semua diproses di perangkat, tanpa unggah.</p>
+</div>
+
+                    </section>
+
+                    <section id="tab-editor-view" class="tab-content hidden space-y-3">
+<div class="bg-slate-900 p-3 rounded-2xl border border-slate-800 flex flex-wrap gap-2 items-center">
+<button class="bt" onclick="$('file-in').click()"><i class="fas fa-folder-open mr-1.5"></i>Buka</button>
+<button class="bs" onclick="simpanProyek()" title="Simpan proyek"><i class="fas fa-floppy-disk"></i></button>
+<button id="b-undo" class="bs" onclick="undo()" title="Urungkan (Ctrl+Z)"><i class="fas fa-rotate-left"></i></button>
+<button id="b-redo" class="bs" onclick="redo()" title="Ulangi (Ctrl+Y)"><i class="fas fa-rotate-right"></i></button>
+<button class="bs" onpointerdown="cmp(1)" onpointerup="cmp(0)" onpointerleave="cmp(0)" title="Tahan untuk melihat gambar asli"><i class="fas fa-eye"></i></button>
+<button class="bs" onclick="zoomBy(-.2)" title="Perkecil"><i class="fas fa-magnifying-glass-minus"></i></button>
+<button class="bs !px-2 min-w-[3.2rem]" onclick="E.zoom=0;fit()" title="Pas layar"><span id="zoom-l">100%</span></button>
+<button class="bs" onclick="zoomBy(.2)" title="Perbesar"><i class="fas fa-magnifying-glass-plus"></i></button>
+<button class="bs !text-red-400 ml-auto" onclick="resetEdit()" title="Kembali ke gambar awal"><i class="fas fa-clock-rotate-left"></i></button>
+<input type="file" id="file-in" accept="image/*" class="hidden" onchange="bukaFile(this.files[0]);this.value=''">
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem] gap-3">
+<div id="stage" class="bg-slate-950 rounded-2xl border border-slate-800 relative flex overflow-auto" ondragover="event.preventDefault()" ondrop="event.preventDefault();bukaFile(event.dataTransfer.files[0])">
+<canvas id="cv" class="m-auto hidden shadow-2xl" style="background:repeating-conic-gradient(#1e293b 0 25%,#0f172a 0 50%) 0 0/16px 16px"></canvas>
+<div id="empty" class="absolute inset-0 flex flex-col items-center justify-center text-center text-slate-500 p-6"><i class="fas fa-image text-5xl mb-3 opacity-40"></i><p class="text-sm font-semibold">Belum ada gambar</p><p class="text-xs mt-1 mb-4">Buka, seret, atau tempel gambar ke sini.</p><button class="bt" onclick="$('file-in').click()">Buka Gambar</button></div>
+</div>
+<div class="bg-slate-900 rounded-2xl border border-slate-800 p-3 space-y-3 self-start min-w-0">
+<div class="grid grid-cols-2 gap-2"><button id="b-undo2" class="bs" onclick="undo()"></button><button id="b-redo2" class="bs" onclick="redo()"></button></div>
+<div id="tools" class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-4 gap-1.5"></div>
+<div id="tp" class="space-y-3"></div>
+</div></div></section>
+
+
+                    <section id="tab-proyek-view" class="tab-content hidden space-y-4">
+                        <p class="text-[11px] text-slate-500">Proyek tersimpan di browser perangkat ini (tidak ikut backup JSON).</p>
+                        <div id="proyek-list" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3"></div>
+                    </section>
+
+                    <section id="tab-pengaturan-view" class="tab-content hidden space-y-4">
+                        <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
+                            <h3 class="text-sm font-bold text-slate-100"><i class="fas fa-id-card text-accent-400 mr-2"></i>Profil Aplikasi</h3>
+                            <label class="block text-[11px] font-semibold text-slate-400">Nama
+                                <input id="set-nama" class="field mt-1" onchange="simpanPengaturan()">
+                            </label>
+                        </div>
+                        <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
+                            <h3 class="text-sm font-bold text-slate-100"><i class="fas fa-database text-accent-400 mr-2"></i>Backup &amp; Restore</h3>
+                            <p class="text-[11px] text-slate-400">Data disimpan di browser perangkat ini. Unduh backup secara rutin; pulihkan di perangkat mana pun dengan file JSON.</p>
+                            <p class="text-[11px] text-slate-500">Backup terakhir: <span id="last-backup" class="text-slate-300">belum pernah</span></p>
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="exportBackup()" class="bg-accent-600 hover:bg-accent-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition"><i class="fas fa-download mr-1.5"></i>Unduh Backup</button>
+                                <button onclick="document.getElementById('import-file').click()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-4 py-2.5 rounded-xl transition"><i class="fas fa-upload mr-1.5"></i>Pulihkan</button>
+                                <button onclick="resetData()" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-bold px-4 py-2.5 rounded-xl transition"><i class="fas fa-trash mr-1.5"></i>Hapus Semua</button>
+                                <input type="file" id="import-file" accept="application/json,.json" class="hidden" onchange="importBackup(event)">
+                            </div>
+                        </div>
+                        <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
+                            <h3 class="text-sm font-bold text-slate-100"><i class="fas fa-mobile-screen text-accent-400 mr-2"></i>Aplikasi</h3>
+                            <p class="text-[11px] text-slate-400">Versi <span id="app-ver"></span></p>
+                            <button id="btn-install" onclick="installApp()" class="hidden bg-accent-600 hover:bg-accent-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition"><i class="fas fa-circle-down mr-1.5"></i>Pasang di Layar Utama</button>
+                        </div>
+                    </section>
+
+                    <!-- TAB:END -->
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    /* ============================================================
+       KONFIGURASI & DATA
+       ============================================================ */
+    const APP = { slug: 'editor-foto', dbKey: 'editor-foto_db_v1', version: '1.3.0' };
+    // Tambah koleksi data baru di sini. Kunci yang belum ada otomatis terisi saat memuat data lama.
+    const DEFAULT_DB = { settings: { nama: 'Editor Foto Pro', lastBackup: null, fmt: 'png', q: 92 }, stats: { opened: 0, exported: 0 } };
+    // Daftar tab: id -> judul header. Setiap tab butuh tombol (btn-<id>) dan section (tab-<id>-view).
+    const TABS = { dashboard: 'Dashboard', editor: 'Editor Gambar', proyek: 'Proyek Saya', pengaturan: 'Pengaturan' };
+
+    let db = loadDB();
+
+    function loadDB() {
+        try {
+            const raw = localStorage.getItem(APP.dbKey);
+            if (raw) return Object.assign(structuredClone(DEFAULT_DB), JSON.parse(raw));
+        } catch (e) { console.warn('Gagal memuat data', e); }
+        return structuredClone(DEFAULT_DB);
+    }
+    function saveDB() {
+        try { localStorage.setItem(APP.dbKey, JSON.stringify(db)); }
+        catch (e) { toast('Penyimpanan penuh atau diblokir browser', 'error'); }
+    }
+
+    /* ============================================================
+       UTILITAS UI
+       ============================================================ */
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const fmtRp = n => 'Rp ' + (Number(n) || 0).toLocaleString('id-ID');
+    const fmtTgl = d => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    function toast(msg, icon = 'success') {
+        Swal.mixin({ toast: true, position: 'top', showConfirmButton: false, timer: 2600, timerProgressBar: true })
+            .fire({ icon, title: msg });
+    }
+    async function konfirmasi(judul, teks, tombol = 'Ya, lanjutkan') {
+        const r = await Swal.fire({ title: judul, text: teks, icon: 'warning', showCancelButton: true,
+            confirmButtonText: tombol, cancelButtonText: 'Batal', confirmButtonColor: '#7c3aed', cancelButtonColor: '#334155' });
+        return r.isConfirmed;
+    }
+
+    /* ============================================================
+       NAVIGASI
+       ============================================================ */
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('hidden');
+    }
+    function switchTab(id) {
+        if (!TABS[id]) id = 'dashboard';
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        const view = document.getElementById('tab-' + id + '-view');
+        view.classList.remove('hidden');
+        view.classList.remove('tab-enter'); void view.offsetWidth; view.classList.add('tab-enter');
+        document.querySelectorAll('.nav-link').forEach(b => b.classList.remove('sidebar-active'));
+        document.getElementById('btn-' + id)?.classList.add('sidebar-active');
+        document.getElementById('header-title').textContent = TABS[id];
+        if (window.innerWidth < 768 && document.getElementById('sidebar').classList.contains('open')) toggleSidebar();
+        try { localStorage.setItem(APP.slug + '_tab', id); } catch (e) {}
+        // Render ulang tab yang dibuka (tambahkan tab baru di sini)
+        if (id === 'dashboard') renderDashboard();
+        if (id === 'editor') renderEditor();
+        if (id === 'proyek') renderProyek();
+        if (id === 'pengaturan') renderPengaturan();
+        document.querySelector('main').scrollTo({ top: 0 });
+    }
+
+    /* ============================================================
+       DASHBOARD
+       ============================================================ */
+    function statCard(ikon, label, nilai, warna = 'accent') {
+        const w = { accent: 'text-accent-400 bg-accent-500/10', amber: 'text-amber-400 bg-amber-500/10', sky: 'text-sky-400 bg-sky-500/10', rose: 'text-rose-400 bg-rose-500/10' }[warna];
+        return `<div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-sm hover:-translate-y-0.5 transition">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center ${w} mb-3"><i class="fas ${ikon}"></i></div>
+            <p class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">${esc(label)}</p>
+            <h4 class="text-xl font-black text-slate-100 mt-1">${esc(nilai)}</h4></div>`;
+    }
+    function renderDashboard() {
+        $('dash-title').textContent = 'Selamat Datang di ' + db.settings.nama;
+        $('dash-stats').innerHTML =
+            statCard('fa-image', 'Gambar Dibuka', db.stats.opened) +
+            statCard('fa-file-export', 'Diekspor', db.stats.exported, 'sky') +
+            statCard('fa-file-image', 'Format Ekspor', db.settings.fmt.toUpperCase().replace('JPEG', 'JPG'), 'amber') +
+            statCard('fa-maximize', 'Batas Ukuran', MAX + ' px', 'rose');
+    }
+
+    /* ============================================================
+       EDITOR GAMBAR
+       ============================================================ */
+    const MAX = 3000;
+    const ADJ0 = { brightness: 100, contrast: 100, saturate: 100, 'hue-rotate': 0, sepia: 0, grayscale: 0, invert: 0, blur: 0 };
+    const SL = [['brightness','Kecerahan',0,200],['contrast','Kontras',0,200],['saturate','Saturasi',0,300],['hue-rotate','Rona (°)',-180,180],['sepia','Sepia',0,100],['grayscale','Abu-abu',0,100],['invert','Negatif',0,100],['blur','Blur (px)',0,20]];
+    const PRE = { 'Asli': {}, 'Hitam Putih': { grayscale: 100 }, 'Sepia': { sepia: 80 }, 'Vintage': { sepia: 40, contrast: 90, brightness: 105, saturate: 80 }, 'Dramatis': { contrast: 140, saturate: 120, brightness: 90 }, 'Cerah': { brightness: 112, saturate: 130, contrast: 105 }, 'Dingin': { 'hue-rotate': -20, saturate: 110, brightness: 102 }, 'Hangat': { sepia: 25, saturate: 130, 'hue-rotate': -8 }, 'Pudar': { contrast: 80, brightness: 110, saturate: 70 }, 'Negatif': { invert: 100 }, 'Lembut': { blur: 1.5, brightness: 108, saturate: 110 } };
+    const TOOLS = [['adjust','fa-sliders','Sesuaikan'],['filter','fa-wand-magic-sparkles','Filter'],['transform','fa-crop-simple','Ubah'],['draw','fa-paintbrush','Gambar'],['shape','fa-shapes','Bentuk'],['text','fa-font','Teks'],['sticker','fa-face-smile','Stiker'],['effect','fa-burst','Efek'],['bg','fa-image-portrait','Latar'],['frame','fa-border-all','Bingkai'],['export','fa-file-export','Ekspor']];
+    const FONTS = [['Plus Jakarta Sans',"'Plus Jakarta Sans',sans-serif"],['Arial',"Arial,sans-serif"],['Georgia',"Georgia,serif"],['Impact',"Impact,sans-serif"],['Courier',"'Courier New',monospace"],['Tulisan tangan',"'Brush Script MT',cursive"]];
+    const E = { base: null, orig: null, adj: { ...ADJ0 }, undo: [], redo: [], tool: 'adjust', zoom: 0, sc: 1, crop: null, cs: null, cmp: false, ratio: 0, pd: false, last: null, px: .5, py: .5, name: 'gambar',
+        br: { c: '#a78bfa', s: 12, o: 100, erase: false }, t: { v: 'Teks Anda', s: 48, c: '#ffffff', f: FONTS[0][1], b: true, sh: true, r: 0 }, f: { w: 40, c: '#ffffff', rd: 12 }, sp: { k: 'rect', c: '#f43f5e', w: 6, fill: false }, s: { e: '😀', s: 120 }, fx: { v: 50, s: 50, g: 30, p: 16 }, shp: null, pid: null, bg: { tol: 30, shrink: 1, soft: 1, contig: true, c: '#dc2626', pv: true, m: 'tap', bw: 40, sp: true }, prot: [], ps: null, pdim: [0, 0] };
+
+    const $ = id => document.getElementById(id);
+    const mk = (w, h) => Object.assign(document.createElement('canvas'), { width: w, height: h });
+    const cp = c => { const n = mk(c.width, c.height); n.getContext('2d').drawImage(c, 0, 0); return n; };
+    const fstr = () => Object.entries(E.adj).map(([k, v]) => k + '(' + v + (k === 'hue-rotate' ? 'deg' : k === 'blur' ? 'px' : '%') + ')').join(' ');
+    const dirty = () => JSON.stringify(E.adj) !== JSON.stringify(ADJ0);
+    const need = () => E.base ? true : (toast('Buka gambar dulu', 'info'), false);
+    const sl = (id, l, a, b, v, js, u = '', st = 1) => `<label class="block text-[11px] font-semibold text-slate-400"><span class="flex justify-between mb-1"><span>${l}</span><b id="v-${id}" class="text-slate-200">${v}${u}</b></span><input type="range" min="${a}" max="${b}" step="${st}" value="${v}" class="w-full accent-accent-500" oninput="$('v-${id}').textContent=this.value+'${u}';${js.replaceAll('@', 'this.value')}"></label>`;
+    const lbl = t => `<p class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">${t}</p>`;
+    const big = () => E.base ? Math.max(E.base.width, E.base.height) : 1000;
+
+    /* riwayat */
+    function snap() { E.undo.push({ c: cp(E.base), a: { ...E.adj } }); if (E.undo.length > 20) E.undo.shift(); E.redo = []; hist(); }
+    function prep() { snap(); if (dirty()) bake(); }
+    function bake() { const c = mk(E.base.width, E.base.height), x = c.getContext('2d'); x.filter = fstr(); x.drawImage(E.base, 0, 0); E.base = c; E.adj = { ...ADJ0 }; }
+    function hist() {
+        const u = !E.undo.length, r = !E.redo.length; ['b-undo', 'b-undo2'].forEach(i => $(i).disabled = u); ['b-redo', 'b-redo2'].forEach(i => $(i).disabled = r);
+        $('b-undo2').innerHTML = '<i class="fas fa-rotate-left mr-1.5"></i>Urungkan' + (u ? '' : ' (' + E.undo.length + ')'); $('b-redo2').innerHTML = '<i class="fas fa-rotate-right mr-1.5"></i>Ulangi' + (r ? '' : ' (' + E.redo.length + ')');
+    }
+    function undo() { if (!E.undo.length) return; E.redo.push({ c: E.base, a: { ...E.adj } }); const s = E.undo.pop(); E.base = s.c; E.adj = s.a; setTool(E.tool); }
+    function redo() { if (!E.redo.length) return; E.undo.push({ c: E.base, a: { ...E.adj } }); const s = E.redo.pop(); E.base = s.c; E.adj = s.a; setTool(E.tool); }
+    async function resetEdit() {
+        if (!need() || !await konfirmasi('Kembalikan ke gambar awal?', 'Semua perubahan akan dibuang.', 'Ya, kembalikan')) return;
+        snap(); E.base = cp(E.orig); E.adj = { ...ADJ0 }; setTool(E.tool);
+    }
+    function cmp(v) { E.cmp = !!v; if (E.base) render(); }
+
+    /* membuka gambar */
+    function initBase(c, name) {
+        const m = Math.max(c.width, c.height);
+        Object.assign(E, { base: c, orig: cp(c), adj: { ...ADJ0 }, undo: [], redo: [], crop: null, zoom: 0, name, px: .5, py: .5, tool: 'adjust' });
+        E.br.s = Math.max(4, Math.round(m / 120)); E.t.s = Math.max(16, Math.round(m / 12)); E.f.w = Math.round(m / 25); E.s.s = Math.round(m / 8); E.sp.w = Math.round(m / 200) + 2; E.pid = null; E.prot = []; E.ps = null; E.bg.bw = Math.round(m / 25);
+        db.stats.opened++; saveDB(); switchTab('editor');
+    }
+    async function bukaFile(f) {
+        if (!f) return;
+        if (!f.type.startsWith('image/')) return toast('Pilih berkas gambar', 'error');
+        try {
+            const bm = await createImageBitmap(f, { imageOrientation: 'from-image' });
+            const s = Math.min(1, MAX / Math.max(bm.width, bm.height)), c = mk(Math.round(bm.width * s), Math.round(bm.height * s));
+            c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height); if (bm.close) bm.close();
+            initBase(c, f.name.replace(/\.[^.]+$/, '') + '-edit');
+            if (s < 1) toast('Gambar diperkecil ke ' + c.width + '×' + c.height + ' px', 'info');
+        } catch (e) { toast('Gambar tidak bisa dibuka', 'error'); }
+    }
+    async function kanvasBaru() {
+        const r = await Swal.fire({ title: 'Kanvas Kosong', showCancelButton: true, confirmButtonText: 'Buat', cancelButtonText: 'Batal', confirmButtonColor: '#7c3aed', cancelButtonColor: '#334155',
+            html: `<div class="text-left space-y-3"><div class="flex gap-2"><input id="kw" type="number" class="field" value="1080" placeholder="Lebar"><input id="kh" type="number" class="field" value="1080" placeholder="Tinggi"></div><input id="kc" type="color" value="#ffffff" class="h-10 w-full bg-transparent"></div>`,
+            preConfirm: () => { const w = +$('kw').value, h = +$('kh').value; if (!(w >= 16 && h >= 16 && w <= MAX && h <= MAX)) { Swal.showValidationMessage('Ukuran 16–' + MAX + ' px'); return false; } return { w, h, c: $('kc').value }; } });
+        if (!r.isConfirmed) return;
+        const c = mk(r.value.w, r.value.h), x = c.getContext('2d'); x.fillStyle = r.value.c; x.fillRect(0, 0, c.width, c.height); initBase(c, 'kanvas');
+    }
+
+    /* tampilan */
+    function render() {
+        const cv = $('cv'); $('empty').classList.toggle('hidden', !!E.base); cv.classList.toggle('hidden', !E.base);
+        if (!E.base) return;
+        const src = E.cmp ? E.orig : E.base;
+        if (cv.width !== src.width || cv.height !== src.height) { cv.width = src.width; cv.height = src.height; }
+        const x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height);
+        if (!E.cmp && E.tool === 'bg' && E.bg.pv) { x.fillStyle = E.bg.c; x.fillRect(0, 0, cv.width, cv.height); }
+        x.filter = E.cmp ? 'none' : fstr(); x.drawImage(src, 0, 0); x.filter = 'none';
+        if (!E.cmp) { if (E.tool === 'text') drawText(x); if (RECT() && E.crop) drawCrop(x); if (E.tool === 'bg') drawProt(x); if (E.tool === 'shape' && E.shp) drawShape(x, E.shp); }
+        fit();
+    }
+    function fit() {
+        if (!E.base) return; const cv = $('cv'), st = $('stage');
+        E.sc = E.zoom || Math.min(1, (st.clientWidth - 24) / cv.width, (st.clientHeight - 24) / cv.height);
+        E.sc = Math.max(.02, E.sc); cv.style.width = cv.width * E.sc + 'px'; cv.style.height = cv.height * E.sc + 'px';
+        $('zoom-l').textContent = Math.round(E.sc * 100) + '%';
+    }
+    function zoomBy(d) { if (!E.base) return; E.zoom = Math.max(.05, E.sc + d); fit(); }
+    window.addEventListener('resize', () => { if (E.base && !E.zoom) fit(); });
+
+    function drawText(x) {
+        const t = E.t, c = x.canvas; x.save(); x.translate(E.px * c.width, E.py * c.height); x.rotate(t.r * Math.PI / 180);
+        x.font = (t.b ? '800 ' : '400 ') + t.s + 'px ' + t.f; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = t.c;
+        if (t.sh) { x.shadowColor = 'rgba(0,0,0,.65)'; x.shadowBlur = t.s / 5; x.shadowOffsetY = t.s / 18; }
+        const L = t.v.split('\n'); L.forEach((l, i) => x.fillText(l, 0, (i - (L.length - 1) / 2) * t.s * 1.2)); x.restore();
+    }
+    function drawCrop(x) {
+        const r = E.crop, w = x.canvas.width; x.save(); x.fillStyle = 'rgba(2,6,23,.6)'; x.beginPath(); x.rect(0, 0, w, x.canvas.height); x.rect(r.x, r.y, r.w, r.h); x.fill('evenodd');
+        x.strokeStyle = '#fff'; x.lineWidth = Math.max(2, w / 400); x.setLineDash([w / 80, w / 80]); x.strokeRect(r.x, r.y, r.w, r.h); x.restore();
+    }
+
+    /* interaksi kanvas */
+    function pt(e) { const cv = $('cv'), r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; }
+    function stroke(a, b) {
+        const x = E.base.getContext('2d'), B = E.br; x.save(); x.globalAlpha = B.o / 100; x.globalCompositeOperation = B.erase ? 'destination-out' : 'source-over';
+        x.strokeStyle = B.c; x.lineWidth = B.s; x.lineCap = x.lineJoin = 'round'; x.beginPath(); x.moveTo(a.x, a.y); x.lineTo(b.x + .01, b.y); x.stroke(); x.restore();
+    }
+    function cropTo(p) {
+        const s = E.cs, W = E.base.width, H = E.base.height; let w = p.x - s.x, h = p.y - s.y;
+        if (E.ratio) h = Math.sign(h || 1) * Math.abs(w) / E.ratio;
+        let x2 = Math.min(W, Math.max(0, s.x + w)), y2 = Math.min(H, Math.max(0, s.y + h));
+        if (E.ratio) { const k = Math.min(Math.abs(x2 - s.x), Math.abs(y2 - s.y) * E.ratio); x2 = s.x + Math.sign(w || 1) * k; y2 = s.y + Math.sign(h || 1) * k / E.ratio; }
+        E.crop = { x: Math.min(s.x, x2), y: Math.min(s.y, y2), w: Math.abs(x2 - s.x), h: Math.abs(y2 - s.y) };
+    }
+    const RECT = () => E.tool === 'transform' || E.tool === 'effect';
+    $('cv').addEventListener('pointerdown', e => {
+        if (!E.base) return; const p = pt(e);
+        if (E.tool === 'bg' && E.bg.m === 'tap') { bgTap(p); return; }
+        if (E.tool === 'sticker') { prep(); emoji(p); render(); return; }
+        if (E.tool === 'draw') { prep(); E.last = p; stroke(p, p); }
+        else if (E.tool === 'text') { E.px = p.x / E.base.width; E.py = p.y / E.base.height; }
+        else if (E.tool === 'bg') { E.ps = E.bg.m === 'brush' ? { k: 'brush', w: E.bg.bw, pts: [p] } : { k: E.bg.m, x1: p.x, y1: p.y, x2: p.x, y2: p.y }; }
+        else if (E.tool === 'shape') { E.shp = { x1: p.x, y1: p.y, x2: p.x, y2: p.y }; }
+        else if (RECT()) { E.cs = p; E.crop = { x: p.x, y: p.y, w: 0, h: 0 }; }
+        else return;
+        E.pd = true; e.target.setPointerCapture(e.pointerId); render();
+    });
+    $('cv').addEventListener('pointermove', e => {
+        if (!E.pd) return; const p = pt(e);
+        if (E.tool === 'draw') { stroke(E.last, p); E.last = p; }
+        else if (E.tool === 'text') { E.px = p.x / E.base.width; E.py = p.y / E.base.height; }
+        else if (E.tool === 'bg' && E.ps) { if (E.ps.k === 'brush') E.ps.pts.push(p); else { E.ps.x2 = p.x; E.ps.y2 = p.y; } }
+        else if (E.tool === 'shape' && E.shp) { E.shp.x2 = p.x; E.shp.y2 = p.y; }
+        else if (RECT()) cropTo(p);
+        render();
+    });
+    ['pointerup', 'pointercancel'].forEach(n => $('cv').addEventListener(n, () => {
+        E.pd = false;
+        if (E.tool === 'bg' && E.ps) { const s = E.ps; E.ps = null; if (s.k === 'brush' || (Math.abs(s.x2 - s.x1) > 4 && Math.abs(s.y2 - s.y1) > 4)) { E.prot.push(s); E.pdim = [E.base.width, E.base.height]; } render(); }
+        if (E.tool === 'shape' && E.shp) { const s = E.shp; E.shp = null; if (Math.hypot(s.x2 - s.x1, s.y2 - s.y1) > 4) { prep(); drawShape(E.base.getContext('2d'), s); } render(); }
+    }));
+
+    /* bentuk, stiker, efek */
+    function drawShape(x, s) {
+        const P = E.sp, { x1, y1, x2, y2 } = s; x.save(); x.strokeStyle = x.fillStyle = P.c; x.lineWidth = P.w; x.lineCap = x.lineJoin = 'round'; x.beginPath();
+        if (P.k === 'rect') x.rect(x1, y1, x2 - x1, y2 - y1);
+        else if (P.k === 'oval') x.ellipse((x1 + x2) / 2, (y1 + y2) / 2, Math.abs(x2 - x1) / 2, Math.abs(y2 - y1) / 2, 0, 0, 7);
+        else { x.moveTo(x1, y1); x.lineTo(x2, y2);
+            if (P.k === 'arrow') { const a = Math.atan2(y2 - y1, x2 - x1), h = P.w * 4; x.moveTo(x2, y2); x.lineTo(x2 - h * Math.cos(a - .5), y2 - h * Math.sin(a - .5)); x.moveTo(x2, y2); x.lineTo(x2 - h * Math.cos(a + .5), y2 - h * Math.sin(a + .5)); } }
+        (P.fill && (P.k === 'rect' || P.k === 'oval')) ? x.fill() : x.stroke(); x.restore();
+    }
+    function emoji(p) { const x = E.base.getContext('2d'); x.font = E.s.s + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(E.s.e, p.x, p.y); }
+    function fxVin() {
+        if (!need()) return; prep(); const x = E.base.getContext('2d'), W = E.base.width, H = E.base.height, g = x.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .3, W / 2, H / 2, Math.hypot(W, H) / 2);
+        g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,' + E.fx.v / 100 + ')'); x.fillStyle = g; x.fillRect(0, 0, W, H); render(); toast('Vinyet diterapkan');
+    }
+    function fxSharp() {
+        if (!need()) return; prep(); const a = E.fx.s / 200, x = E.base.getContext('2d'), W = E.base.width, H = E.base.height, I = x.getImageData(0, 0, W, H), s = I.data, o = new Uint8ClampedArray(s), r = W * 4;
+        for (let y = 1; y < H - 1; y++) for (let i = y * r + 4, e = y * r + r - 4; i < e; i++) { if ((i & 3) === 3) continue; s[i] = o[i] * (1 + 4 * a) - a * (o[i - 4] + o[i + 4] + o[i - r] + o[i + r]); }
+        x.putImageData(I, 0, 0); render(); toast('Gambar dipertajam');
+    }
+    function fxGrain() {
+        if (!need()) return; prep(); const x = E.base.getContext('2d'), I = x.getImageData(0, 0, E.base.width, E.base.height), d = I.data, a = E.fx.g * 1.5;
+        for (let i = 0; i < d.length; i += 4) { const n = (Math.random() - .5) * a; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+        x.putImageData(I, 0, 0); render(); toast('Grain ditambahkan');
+    }
+    function fxPixel() {
+        if (!need()) return; prep(); const c = E.base, x = c.getContext('2d'), R = E.crop && E.crop.w > 8 && E.crop.h > 8 ? E.crop : { x: 0, y: 0, w: c.width, h: c.height }, b = E.fx.p;
+        const w = Math.max(1, Math.round(R.w / b)), h = Math.max(1, Math.round(R.h / b)), t = mk(w, h); t.getContext('2d').drawImage(c, R.x, R.y, R.w, R.h, 0, 0, w, h);
+        x.save(); x.imageSmoothingEnabled = false; x.drawImage(t, 0, 0, w, h, R.x, R.y, R.w, R.h); x.restore(); E.crop = null; setTool('effect'); toast('Pixelate diterapkan');
+    }
+    function autoFix() { if (!need()) return; E.adj = { ...ADJ0, brightness: 104, contrast: 112, saturate: 115 }; setTool('adjust'); }
+    function fitTo(w, h) {
+        if (!need()) return; snap(); const b = E.base, c = mk(w, h), x = c.getContext('2d'), s = Math.max(w / b.width, h / b.height);
+        x.imageSmoothingQuality = 'high'; x.drawImage(b, (w - b.width * s) / 2, (h - b.height * s) / 2, b.width * s, b.height * s); E.base = c; setTool('transform'); toast('Ukuran disesuaikan');
+    }
+    function applyRound() {
+        if (!need()) return; prep(); const W = E.base.width, H = E.base.height, c = mk(W, H), x = c.getContext('2d');
+        x.beginPath(); x.roundRect(0, 0, W, H, Math.min(W, H) * E.f.rd / 100); x.clip(); x.drawImage(E.base, 0, 0); E.base = c; setTool('frame'); toast('Sudut diterapkan');
+    }
+    function flat(jpg) { const c = mk(E.base.width, E.base.height), x = c.getContext('2d'); if (jpg) { x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); } x.filter = fstr(); x.drawImage(E.base, 0, 0); return c; }
+    function bagikan() {
+        if (!need()) return; const s = db.settings;
+        flat(s.fmt === 'jpeg').toBlob(async b => {
+            const f = new File([b], (E.name || 'gambar') + '.' + (b.type === 'image/jpeg' ? 'jpg' : b.type.split('/')[1]), { type: b.type });
+            try { if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: E.name }); else toast('Perangkat ini tidak mendukung berbagi berkas', 'info'); } catch (e) {}
+        }, 'image/' + s.fmt, s.q / 100);
+    }
+    function salin() {
+        if (!need()) return;
+        flat(false).toBlob(async b => { try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); toast('Gambar disalin'); } catch (e) { toast('Browser menolak menyalin', 'error'); } }, 'image/png');
+    }
+
+    /* hapus & ganti latar */
+    function protPath(x, s) {
+        x.beginPath();
+        if (s.k === 'oval') x.ellipse((s.x1 + s.x2) / 2, (s.y1 + s.y2) / 2, Math.abs(s.x2 - s.x1) / 2, Math.abs(s.y2 - s.y1) / 2, 0, 0, 7);
+        else if (s.k === 'rect') x.rect(Math.min(s.x1, s.x2), Math.min(s.y1, s.y2), Math.abs(s.x2 - s.x1), Math.abs(s.y2 - s.y1));
+        else { x.lineWidth = s.w; x.lineCap = x.lineJoin = 'round'; s.pts.forEach((p, i) => i ? x.lineTo(p.x, p.y) : x.moveTo(p.x, p.y)); if (s.pts.length === 1) x.lineTo(s.pts[0].x + .1, s.pts[0].y); }
+    }
+    function drawProt(x) {
+        if (!E.bg.sp) return; const c = x.canvas;
+        if (E.prot.length && (E.pdim[0] !== c.width || E.pdim[1] !== c.height)) E.prot = [];
+        x.save(); [...E.prot, E.ps].filter(Boolean).forEach(s => {
+            protPath(x, s);
+            if (s.k === 'brush') { x.strokeStyle = 'rgba(34,197,94,.5)'; x.stroke(); }
+            else { x.fillStyle = 'rgba(34,197,94,.35)'; x.fill(); x.strokeStyle = 'rgba(34,197,94,.95)'; x.lineWidth = Math.max(2, c.width / 300); x.stroke(); }
+        }); x.restore();
+    }
+    function protMask(W, H) {
+        if (!E.prot.length || E.pdim[0] !== W || E.pdim[1] !== H) return null;
+        const c = mk(W, H), x = c.getContext('2d'); x.fillStyle = x.strokeStyle = '#fff';
+        E.prot.forEach(s => { protPath(x, s); s.k === 'brush' ? x.stroke() : x.fill(); });
+        const d = x.getImageData(0, 0, W, H).data, m = new Uint8Array(W * H); for (let i = 0; i < m.length; i++) m[i] = d[i * 4 + 3] > 40 ? 1 : 0; return m;
+    }
+    function bgMask(seeds, ref, contig, P) {
+        const W = E.base.width, H = E.base.height, N = W * H, d = E.base.getContext('2d').getImageData(0, 0, W, H).data, T = (E.bg.tol * 3) ** 2, m = new Uint8Array(N);
+        const ok = i => { if (P && P[i]) return false; const o = i * 4; if (d[o + 3] < 10) return true; const r = d[o] - ref[0], g = d[o + 1] - ref[1], b = d[o + 2] - ref[2]; return r * r + g * g + b * b <= T; };
+        if (!contig) { for (let i = 0; i < N; i++) if (ok(i)) m[i] = 1; return m; }
+        const st = []; seeds.forEach(i => { if (!m[i] && ok(i)) { m[i] = 1; st.push(i); } });
+        while (st.length) {
+            const i = st.pop(), x = i % W;
+            if (x > 0 && !m[i - 1] && ok(i - 1)) { m[i - 1] = 1; st.push(i - 1); }
+            if (x < W - 1 && !m[i + 1] && ok(i + 1)) { m[i + 1] = 1; st.push(i + 1); }
+            if (i >= W && !m[i - W] && ok(i - W)) { m[i - W] = 1; st.push(i - W); }
+            if (i < N - W && !m[i + W] && ok(i + W)) { m[i + W] = 1; st.push(i + W); }
+        }
+        return m;
+    }
+    function bgRemove(ref, seeds) {
+        const W = E.base.width, H = E.base.height, P = protMask(W, H); let m = bgMask(seeds, ref, E.bg.contig, P);
+        for (let k = 0; k < E.bg.shrink; k++) { const n = m.slice(); for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) { const i = y * W + x; if (!m[i] && !(P && P[i]) && (m[i - 1] || m[i + 1] || m[i - W] || m[i + W])) n[i] = 1; } m = n; }
+        const M = mk(W, H), mx = M.getContext('2d'), I = mx.createImageData(W, H);
+        for (let i = 0; i < W * H; i++) I.data[i * 4 + 3] = m[i] ? 0 : 255;
+        mx.putImageData(I, 0, 0); let K = M;
+        if (E.bg.soft > 0) { K = mk(W, H); const kx = K.getContext('2d'); kx.filter = 'blur(' + E.bg.soft + 'px)'; kx.drawImage(M, 0, 0); }
+        const x = E.base.getContext('2d'); x.save(); x.globalCompositeOperation = 'destination-in'; x.drawImage(K, 0, 0); x.restore(); render(); toast(P ? 'Latar dihapus, area lindungan aman' : 'Latar dihapus');
+    }
+    function bgTap(p) {
+        const W = E.base.width, x = Math.min(W - 1, Math.max(0, Math.floor(p.x))), y = Math.min(E.base.height - 1, Math.max(0, Math.floor(p.y)));
+        if (E.base.getContext('2d').getImageData(x, y, 1, 1).data[3] < 10) return toast('Bagian ini sudah transparan', 'info');
+        prep(); const d = E.base.getContext('2d').getImageData(x, y, 1, 1).data; bgRemove([d[0], d[1], d[2]], [y * W + x]);
+    }
+    function bgAuto() {
+        if (!need()) return; prep(); const W = E.base.width, H = E.base.height, d = E.base.getContext('2d').getImageData(0, 0, W, H).data;
+        const c = [[0, 0], [W - 1, 0], [0, H - 1], [W - 1, H - 1]].map(([x, y]) => { const o = (y * W + x) * 4; return [d[o], d[o + 1], d[o + 2], d[o + 3]]; }).filter(v => v[3] >= 10);
+        if (!c.length) return toast('Gambar sudah transparan', 'info');
+        const ref = [0, 1, 2].map(k => c.map(v => v[k]).sort((a, b) => a - b)[c.length >> 1]), seeds = [];
+        for (let x = 0; x < W; x++) seeds.push(x, (H - 1) * W + x); for (let y = 0; y < H; y++) seeds.push(y * W, y * W + W - 1);
+        bgRemove(ref, seeds);
+    }
+    function bgFill() {
+        if (!need()) return; prep(); const b = E.base, n = mk(b.width, b.height), x = n.getContext('2d');
+        x.fillStyle = E.bg.c; x.fillRect(0, 0, n.width, n.height); x.drawImage(b, 0, 0); E.base = n; setTool('bg'); toast('Warna latar diterapkan');
+    }
+
+    /* proyek tersimpan (IndexedDB, gambar tidak masuk backup JSON) */
+    const idb = () => new Promise((ok, no) => { const r = indexedDB.open('editor-foto-proyek', 1); r.onupgradeneeded = () => r.result.createObjectStore('p', { keyPath: 'id' }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+    async function idbDo(mode, fn) { const d = await idb(); return new Promise((ok, no) => { const t = d.transaction('p', mode), q = fn(t.objectStore('p')); t.oncomplete = () => ok(q && q.result); t.onerror = () => no(t.error); }); }
+    async function simpanProyek() {
+        if (!need()) return; const c = flat(false), th = mk(200, Math.max(1, Math.round(200 * c.height / c.width))); th.getContext('2d').drawImage(c, 0, 0, th.width, th.height);
+        const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+        try { E.pid = E.pid || uid(); await idbDo('readwrite', s => s.put({ id: E.pid, nama: E.name, tgl: new Date().toISOString(), w: c.width, h: c.height, blob, thumb: th.toDataURL('image/jpeg', .7) })); toast('Proyek disimpan'); }
+        catch (e) { toast('Gagal menyimpan (penyimpanan penuh?)', 'error'); }
+    }
+    async function renderProyek() {
+        const box = $('proyek-list'); let list = [];
+        try { list = (await idbDo('readonly', s => s.getAll())) || []; } catch (e) {}
+        list.sort((a, b) => b.tgl.localeCompare(a.tgl));
+        if (!list.length) { box.innerHTML = `<div class="col-span-full text-center py-16 text-slate-500"><i class="fas fa-folder-open text-4xl mb-3 opacity-40"></i><p class="text-sm font-semibold">Belum ada proyek tersimpan</p><p class="text-xs mt-1">Tekan ikon disket di Editor untuk menyimpan.</p></div>`; return; }
+        box.innerHTML = list.map(p => `<div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden"><img src="${p.thumb}" class="w-full h-28 object-cover bg-slate-950" alt=""><div class="p-3"><h4 class="text-xs font-bold text-slate-100 truncate">${esc(p.nama)}</h4><p class="text-[10px] text-slate-500">${p.w}×${p.h} · ${fmtTgl(p.tgl)}</p><div class="flex gap-2 mt-2"><button class="bt flex-1 !py-1.5" onclick="bukaProyek('${p.id}')">Buka</button><button class="bs !px-3 !py-1.5 !text-red-400" onclick="hapusProyek('${p.id}')" title="Hapus"><i class="fas fa-trash-can"></i></button></div></div></div>`).join('');
+    }
+    async function bukaProyek(id) {
+        const p = await idbDo('readonly', s => s.get(id)); if (!p) return;
+        const bm = await createImageBitmap(p.blob), c = mk(bm.width, bm.height); c.getContext('2d').drawImage(bm, 0, 0); initBase(c, p.nama); E.pid = id;
+    }
+    async function hapusProyek(id) { if (!await konfirmasi('Hapus proyek ini?', 'Tindakan ini tidak bisa dibatalkan.', 'Ya, hapus')) return; await idbDo('readwrite', s => s.delete(id)); renderProyek(); toast('Proyek dihapus'); }
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+
+
+    /* operasi */
+    function applyAdj() { if (!dirty()) return toast('Belum ada penyesuaian', 'info'); prep(); setTool(E.tool); toast('Diterapkan'); }
+    function setAdj(k, v) { E.adj[k] = +v; render(); }
+    function setPre(n) { E.adj = { ...ADJ0, ...PRE[n] }; render(); }
+    function rot(d) {
+        if (!need()) return; snap(); const b = E.base, c = mk(b.height, b.width), x = c.getContext('2d');
+        x.translate(c.width / 2, c.height / 2); x.rotate(d * Math.PI / 180); x.drawImage(b, -b.width / 2, -b.height / 2); E.base = c; E.prot = []; setTool('transform');
+    }
+    function flip(h) {
+        if (!need()) return; snap(); const b = E.base, c = mk(b.width, b.height), x = c.getContext('2d');
+        if (h) { x.translate(b.width, 0); x.scale(-1, 1); } else { x.translate(0, b.height); x.scale(1, -1); }
+        x.drawImage(b, 0, 0); E.base = c; E.prot = []; render();
+    }
+    function applyCrop() {
+        const r = E.crop; if (!need()) return; if (!r || r.w < 8 || r.h < 8) return toast('Seret di gambar untuk memilih area', 'info');
+        snap(); const c = mk(Math.round(r.w), Math.round(r.h)); c.getContext('2d').drawImage(E.base, r.x, r.y, r.w, r.h, 0, 0, c.width, c.height);
+        E.base = c; E.crop = null; setTool('transform'); toast('Dipotong');
+    }
+    function rz(k) {
+        if (!$('rl').checked) return; const w = E.base.width, h = E.base.height;
+        if (k === 'w') $('rh').value = Math.round($('rw').value * h / w); else $('rw').value = Math.round($('rh').value * w / h);
+    }
+    function applyResize() {
+        if (!need()) return; const w = Math.round($('rw').value), h = Math.round($('rh').value);
+        if (!(w >= 1 && h >= 1 && w <= 8000 && h <= 8000)) return toast('Ukuran 1–8000 px', 'error');
+        snap(); const c = mk(w, h), x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(E.base, 0, 0, w, h); E.base = c; setTool('transform'); toast('Ukuran diubah');
+    }
+    function applyText() {
+        if (!need()) return; if (!E.t.v.trim()) return toast('Teks masih kosong', 'error');
+        prep(); drawText(E.base.getContext('2d')); setTool('adjust'); toast('Teks ditambahkan');
+    }
+    function applyFrame() {
+        if (!need()) return; prep(); const w = E.f.w, b = E.base, c = mk(b.width + 2 * w, b.height + 2 * w), x = c.getContext('2d');
+        x.fillStyle = E.f.c; x.fillRect(0, 0, c.width, c.height); x.drawImage(b, w, w); E.base = c; setTool('frame'); toast('Bingkai ditambahkan');
+    }
+    function unduh() {
+        if (!need()) return; const s = db.settings, mime = 'image/' + s.fmt, c = mk(E.base.width, E.base.height), x = c.getContext('2d');
+        if (s.fmt === 'jpeg') { x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); }
+        x.filter = fstr(); x.drawImage(E.base, 0, 0);
+        c.toBlob(b => {
+            if (!b) return toast('Gagal membuat berkas', 'error');
+            const ext = b.type === 'image/jpeg' ? 'jpg' : b.type.split('/')[1], a = document.createElement('a');
+            a.href = URL.createObjectURL(b); a.download = ($('en').value.trim() || 'gambar').replace(/[\\/:*?"<>|]+/g, '-') + '.' + ext; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+            db.stats.exported++; saveDB(); toast('Diunduh (' + Math.round(b.size / 1024) + ' KB)');
+        }, mime, s.q / 100);
+    }
+
+    /* panel alat */
+    const PANEL = {
+        adjust: () => SL.map(([k, l, a, b]) => sl(k, l, a, b, E.adj[k], `setAdj('${k}',@)`)).join('') +
+            `<div class="flex gap-2"><button class="bt flex-1" onclick="applyAdj()"><i class="fas fa-check mr-1"></i>Terapkan</button><button class="bs" onclick="autoFix()">Otomatis</button><button class="bs" onclick="E.adj={...ADJ0};setTool('adjust')">Atur ulang</button></div>`,
+        filter: () => `<div class="grid grid-cols-3 gap-2">${Object.keys(PRE).map(n => `<button class="bs !px-1 !text-[11px]" onclick="setPre('${n}')">${n}</button>`).join('')}</div><button class="bt w-full" onclick="applyAdj()">Terapkan filter</button><p class="text-[10px] text-slate-500">Pilih filter, lalu sempurnakan di menu Sesuaikan sebelum diterapkan.</p>`,
+        transform: () => `<div class="grid grid-cols-4 gap-2">${[['rot(-90)', 'fa-rotate-left', 'Kiri'], ['rot(90)', 'fa-rotate-right', 'Kanan'], ['flip(1)', 'fa-left-right', 'Balik H'], ['flip(0)', 'fa-up-down', 'Balik V']].map(([f, i, t]) => `<button class="bs flex flex-col items-center gap-1 !px-1 !text-[10px]" onclick="${f}"><i class="fas ${i}"></i>${t}</button>`).join('')}</div>` +
+            lbl('Potong (seret di gambar)') + `<div class="flex flex-wrap gap-1.5">${[['Bebas', 0], ['1:1', 1], ['4:3', 4 / 3], ['3:4', 3 / 4], ['16:9', 16 / 9], ['9:16', 9 / 16]].map(([n, r]) => `<button class="bs !px-3 !py-1.5" onclick="E.ratio=${r};E.crop=null;render()">${n}</button>`).join('')}</div><button class="bt w-full" onclick="applyCrop()"><i class="fas fa-crop-simple mr-1"></i>Potong</button>` +
+            lbl('Ukuran siap pakai (potong tengah)') + `<div class="flex flex-wrap gap-1.5">${[['IG 1:1',1080,1080],['IG 4:5',1080,1350],['Story',1080,1920],['HD',1920,1080],['Profil',640,640],['Pas foto 3×4',354,472]].map(([n,w,h]) => `<button class="bs !px-3 !py-1.5" onclick="fitTo(${w},${h})">${n}</button>`).join('')}</div>` + lbl('Ubah ukuran (px)') + `<div class="flex gap-2 items-center"><input id="rw" type="number" class="field" value="${E.base ? E.base.width : ''}" oninput="rz('w')"><span class="text-slate-500">×</span><input id="rh" type="number" class="field" value="${E.base ? E.base.height : ''}" oninput="rz('h')"></div><label class="flex gap-2 text-[11px] text-slate-400"><input type="checkbox" id="rl" checked> Kunci rasio</label><button class="bs w-full" onclick="applyResize()">Terapkan ukuran</button>`,
+        draw: () => `<div class="flex gap-2"><button class="${E.br.erase ? 'bs' : 'bt'} flex-1" onclick="E.br.erase=false;setTool('draw')"><i class="fas fa-paintbrush mr-1"></i>Kuas</button><button class="${E.br.erase ? 'bt' : 'bs'} flex-1" onclick="E.br.erase=true;setTool('draw')"><i class="fas fa-eraser mr-1"></i>Penghapus</button></div>` +
+            `<label class="flex items-center gap-3 text-[11px] font-semibold text-slate-400">Warna <input type="color" value="${E.br.c}" class="h-9 w-14 bg-transparent" oninput="E.br.c=this.value"></label>` +
+            sl('bs', 'Ukuran', 1, Math.max(100, Math.round(big() / 8)), E.br.s, 'E.br.s=+@') + sl('bo', 'Opasitas', 5, 100, E.br.o, 'E.br.o=+@', '%') + `<p class="text-[10px] text-slate-500">Seret di gambar untuk menggambar. Kesalahan bisa diurungkan.</p>`,
+        shape: () => `<div class="grid grid-cols-4 gap-2">${[['line', 'fa-minus', 'Garis'], ['arrow', 'fa-arrow-right', 'Panah'], ['rect', 'fa-square', 'Kotak'], ['oval', 'fa-circle', 'Oval']].map(([k, i, n]) => `<button class="${E.sp.k === k ? 'bt' : 'bs'} flex flex-col items-center gap-1 !px-1 !text-[10px]" onclick="E.sp.k='${k}';setTool('shape')"><i class="fas ${i}"></i>${n}</button>`).join('')}</div><label class="flex items-center gap-3 text-[11px] font-semibold text-slate-400">Warna <input type="color" value="${E.sp.c}" class="h-9 w-14 bg-transparent" oninput="E.sp.c=this.value"></label>` +
+            sl('sw', 'Tebal garis', 1, Math.max(40, Math.round(big() / 20)), E.sp.w, 'E.sp.w=+@') + `<label class="flex gap-2 text-[11px] text-slate-400"><input type="checkbox" ${E.sp.fill ? 'checked' : ''} onchange="E.sp.fill=this.checked"> Isi warna (kotak/oval)</label><p class="text-[10px] text-slate-500">Seret di gambar untuk membuat bentuk.</p>`,
+        sticker: () => `<div class="grid grid-cols-6 gap-1.5">${'😀 😂 😍 😎 🥳 😭 🔥 ❤️ ⭐ ✨ 👍 🎉 🌈 ☀️ 🌙 🌸 🍀 🎈 🏆 💯 ✅ ❌ ⚠️ 📍'.split(' ').map(e => `<button class="${E.s.e === e ? 'bt' : 'bs'} !px-0 !text-lg" onclick="E.s.e='${e}';setTool('sticker')">${e}</button>`).join('')}</div>` + sl('ss', 'Ukuran', 16, Math.max(300, Math.round(big() / 3)), E.s.s, 'E.s.s=+@') + `<p class="text-[10px] text-slate-500">Ketuk di gambar untuk menempelkan stiker.</p>`,
+        effect: () => sl('fv', 'Vinyet', 5, 90, E.fx.v, 'E.fx.v=+@', '%') + `<button class="bs w-full" onclick="fxVin()">Terapkan vinyet</button>` + sl('fs', 'Ketajaman', 10, 100, E.fx.s, 'E.fx.s=+@', '%') + `<button class="bs w-full" onclick="fxSharp()">Pertajam</button>` + sl('fg', 'Grain / butiran', 5, 100, E.fx.g, 'E.fx.g=+@', '%') + `<button class="bs w-full" onclick="fxGrain()">Tambah grain</button>` +
+            lbl('Pixelate / sensor') + sl('fp', 'Ukuran blok', 4, Math.max(60, Math.round(big() / 20)), E.fx.p, 'E.fx.p=+@') + `<button class="bt w-full" onclick="fxPixel()">Pixelate (area terpilih / seluruh)</button><p class="text-[10px] text-slate-500">Seret di gambar untuk memilih area yang disensor.</p>`,
+        bg: () => lbl('1. Lindungi bagian yang tidak boleh berubah') + `<p class="text-[11px] text-slate-400">Tandai badan, baju, atau rambut yang warnanya mirip latar. Area hijau tidak ikut terhapus atau berganti warna.</p>` +
+            `<div class="grid grid-cols-4 gap-1.5">${[['tap', 'fa-hand-pointer', 'Ketuk'], ['oval', 'fa-circle', 'Oval'], ['rect', 'fa-square', 'Kotak'], ['brush', 'fa-paintbrush', 'Kuas']].map(([k, i, n]) => `<button class="${E.bg.m === k ? 'bt' : 'bs'} flex flex-col items-center gap-1 !px-1 !text-[10px]" onclick="E.bg.m='${k}';setTool('bg')"><i class="fas ${i}"></i>${n}</button>`).join('')}</div>` +
+            `<p class="text-[10px] text-slate-500">${ { tap: 'Mode Ketuk: ketuk latar untuk menghapusnya.', oval: 'Seret di gambar untuk melindungi area oval/lingkaran.', rect: 'Seret di gambar untuk melindungi area kotak.', brush: 'Sapukan di gambar untuk melindungi dengan kuas.' }[E.bg.m] }</p>` +
+            (E.bg.m === 'brush' ? sl('bbw', 'Ukuran kuas', 2, Math.max(100, Math.round(big() / 8)), E.bg.bw, 'E.bg.bw=+@') : '') +
+            `<div class="grid grid-cols-2 gap-2"><button class="bs" onclick="E.prot.pop();render()">Urungkan lindungan</button><button class="bs" onclick="E.prot=[];render()">Hapus semua</button></div><label class="flex gap-2 text-[11px] text-slate-400"><input type="checkbox" ${E.bg.sp ? 'checked' : ''} onchange="E.bg.sp=this.checked;render()"> Tampilkan area lindungan</label>` +
+            lbl('2. Hapus latar') + `<p class="text-[11px] text-slate-400">Pilih mode Ketuk lalu ketuk latar, atau pakai tombol otomatis.</p><button class="bt w-full" onclick="bgAuto()"><i class="fas fa-wand-magic-sparkles mr-1.5"></i>Hapus latar otomatis</button>` +
+            sl('btol', 'Toleransi warna', 5, 100, E.bg.tol, 'E.bg.tol=+@', '%') + sl('bshr', 'Kikis tepi', 0, 5, E.bg.shrink, 'E.bg.shrink=+@', ' px') + sl('bsoft', 'Haluskan tepi', 0, 6, E.bg.soft, 'E.bg.soft=+@', ' px', .5) +
+            `<label class="flex gap-2 text-[11px] text-slate-400"><input type="checkbox" ${E.bg.contig ? 'checked' : ''} onchange="E.bg.contig=this.checked"> Hanya area yang tersambung dengan titik ketuk</label>` +
+            lbl('3. Ganti warna latar') + `<div class="grid grid-cols-7 gap-1.5">${[['Merah', '#dc2626'], ['Biru', '#2563eb'], ['Putih', '#ffffff'], ['Hijau', '#16a34a'], ['Kuning', '#facc15'], ['Abu', '#94a3b8'], ['Hitam', '#000000']].map(([n, c]) => `<button title="${n}" class="h-9 rounded-lg border-2 ${E.bg.c === c ? 'border-white' : 'border-slate-700'}" style="background:${c}" onclick="E.bg.c='${c}';setTool('bg')"></button>`).join('')}</div>` +
+            `<label class="flex items-center gap-3 text-[11px] font-semibold text-slate-400">Warna lain <input type="color" value="${E.bg.c}" class="h-9 w-14 bg-transparent" oninput="E.bg.c=this.value;render()"></label><label class="flex gap-2 text-[11px] text-slate-400"><input type="checkbox" ${E.bg.pv ? 'checked' : ''} onchange="E.bg.pv=this.checked;render()"> Pratinjau warna di bagian transparan</label><button class="bt w-full" onclick="bgFill()"><i class="fas fa-fill-drip mr-1.5"></i>Terapkan warna latar</button><p class="text-[10px] text-slate-500">Tekan Terapkan agar warna ikut tersimpan. Bagian yang masih tersisa: lindungi dulu bagian yang harus tetap, lalu naikkan toleransi dan hapus lagi.</p>`,
+        text: () => `<textarea class="field" rows="2" oninput="E.t.v=this.value;render()">${esc(E.t.v)}</textarea><select class="field" onchange="E.t.f=this.value;render()">${FONTS.map(f => `<option value="${esc(f[1])}" ${E.t.f === f[1] ? 'selected' : ''}>${f[0]}</option>`).join('')}</select>` +
+            sl('ts', 'Ukuran', 8, Math.max(200, Math.round(big() / 2)), E.t.s, 'E.t.s=+@;render()') + sl('tr', 'Putar (°)', -180, 180, E.t.r, 'E.t.r=+@;render()') +
+            `<div class="flex items-center gap-3 text-[11px] text-slate-400 flex-wrap"><input type="color" value="${E.t.c}" class="h-9 w-12 bg-transparent" oninput="E.t.c=this.value;render()"><label><input type="checkbox" ${E.t.b ? 'checked' : ''} onchange="E.t.b=this.checked;render()"> Tebal</label><label><input type="checkbox" ${E.t.sh ? 'checked' : ''} onchange="E.t.sh=this.checked;render()"> Bayangan</label></div><button class="bt w-full" onclick="applyText()"><i class="fas fa-check mr-1"></i>Tambahkan ke gambar</button><p class="text-[10px] text-slate-500">Ketuk atau seret di gambar untuk memindahkan teks.</p>`,
+        frame: () => sl('fw', 'Tebal bingkai (px)', 1, Math.max(200, Math.round(big() / 4)), E.f.w, 'E.f.w=+@') + `<label class="flex items-center gap-3 text-[11px] font-semibold text-slate-400">Warna <input type="color" value="${E.f.c}" class="h-9 w-14 bg-transparent" oninput="E.f.c=this.value"></label><button class="bt w-full" onclick="applyFrame()">Tambahkan bingkai</button>` + lbl('Sudut membulat') + sl('fr', 'Radius', 0, 50, E.f.rd, 'E.f.rd=+@', '%') + `<button class="bs w-full" onclick="applyRound()">Terapkan sudut (50% = lingkaran)</button>`,
+        export: () => `<select class="field" onchange="db.settings.fmt=this.value;saveDB();setTool('export')">${[['png', 'PNG (tanpa kehilangan)'], ['jpeg', 'JPG (ukuran kecil)'], ['webp', 'WebP (modern)']].map(([v, n]) => `<option value="${v}" ${db.settings.fmt === v ? 'selected' : ''}>${n}</option>`).join('')}</select>` +
+            (db.settings.fmt !== 'png' ? sl('eq', 'Kualitas', 10, 100, db.settings.q, 'db.settings.q=+@;saveDB()', '%') : '') +
+            `<input id="en" class="field" value="${esc(E.name)}" placeholder="Nama berkas"><p class="text-[11px] text-slate-500">${E.base ? E.base.width + ' × ' + E.base.height + ' px' : 'Belum ada gambar'}</p><button class="bt w-full" onclick="unduh()"><i class="fas fa-download mr-1.5"></i>Unduh Gambar</button><div class="grid grid-cols-2 gap-2"><button class="bs" onclick="bagikan()"><i class="fas fa-share-nodes mr-1.5"></i>Bagikan</button><button class="bs" onclick="salin()"><i class="fas fa-copy mr-1.5"></i>Salin</button></div>`
+    };
+    function setTool(t) {
+        E.tool = t; E.shp = null; if (t !== 'transform' && t !== 'effect') E.crop = null; if (t === 'effect') E.ratio = 0;
+        $('tools').innerHTML = TOOLS.map(([id, i, n]) => `<button onclick="setTool('${id}')" class="${id === t ? 'sidebar-active' : 'bg-slate-800 text-slate-300'} flex flex-col items-center gap-1 px-1 py-2 rounded-xl text-[10px] font-bold min-w-0 transition"><i class="fas ${i}"></i>${n}</button>`).join('');
+        $('tp').innerHTML = PANEL[t]();
+        const draw = ['draw', 'text', 'transform', 'shape', 'sticker', 'effect', 'bg'].includes(t); $('cv').style.touchAction = draw ? 'none' : 'auto'; $('stage').style.cursor = draw ? 'crosshair' : 'default';
+        hist(); render();
+    }
+    const renderEditor = () => setTool(E.tool);
+
+    window.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])][0]; if (f) bukaFile(f); });
+    document.addEventListener('keydown', e => {
+        if (!(e.ctrlKey || e.metaKey) || $('tab-editor-view').classList.contains('hidden') || e.target.matches('input,textarea,select')) return;
+        const k = e.key.toLowerCase(); if (k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); } else if (k === 'y') { e.preventDefault(); redo(); }
+    });
+    if (!('filter' in CanvasRenderingContext2D.prototype)) setTimeout(() => toast('Browser ini belum mendukung filter kanvas. Gunakan Chrome/Edge.', 'info'), 1500);
+
+    /* ============================================================
+       PENGATURAN, BACKUP & RESTORE
+       ============================================================ */
+    function renderPengaturan() {
+        document.getElementById('set-nama').value = db.settings.nama;
+        document.getElementById('app-ver').textContent = APP.version;
+        document.getElementById('last-backup').textContent = db.settings.lastBackup ? fmtTgl(db.settings.lastBackup) : 'belum pernah';
+    }
+    function simpanPengaturan() {
+        db.settings.nama = document.getElementById('set-nama').value.trim() || DEFAULT_DB.settings.nama;
+        saveDB(); document.getElementById('side-nama').textContent = db.settings.nama; toast('Pengaturan disimpan');
+    }
+    function exportBackup() {
+        db.settings.lastBackup = new Date().toISOString(); saveDB();
+        const blob = new Blob([JSON.stringify({ _app: APP.slug, _version: APP.version, data: db }, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${APP.slug}-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        renderPengaturan(); toast('Backup diunduh');
+    }
+    function importBackup(ev) {
+        const file = ev.target.files[0]; ev.target.value = '';
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async () => {
+            try {
+                const obj = JSON.parse(reader.result);
+                if (obj._app !== APP.slug || typeof obj.data !== 'object') throw new Error('Bukan file backup aplikasi ini');
+                if (!await konfirmasi('Pulihkan data?', 'Semua data saat ini akan diganti isi backup.', 'Ya, pulihkan')) return;
+                db = Object.assign(structuredClone(DEFAULT_DB), obj.data);
+                saveDB(); init(); toast('Data berhasil dipulihkan');
+            } catch (e) { Swal.fire({ icon: 'error', title: 'Gagal memulihkan', text: e.message }); }
+        };
+        reader.readAsText(file);
+    }
+    async function resetData() {
+        if (!await konfirmasi('Hapus SEMUA data?', 'Pastikan sudah backup. Data tidak bisa dikembalikan.', 'Ya, hapus semua')) return;
+        db = structuredClone(DEFAULT_DB); saveDB(); init(); toast('Semua data dihapus');
+    }
+
+    /* ============================================================
+       PWA: pasang aplikasi, status jaringan, service worker
+       ============================================================ */
+    let deferredInstall = null;
+    window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; document.getElementById('btn-install').classList.remove('hidden'); });
+    window.addEventListener('appinstalled', () => { deferredInstall = null; document.getElementById('btn-install').classList.add('hidden'); toast('Aplikasi terpasang'); });
+    async function installApp() { if (!deferredInstall) return; deferredInstall.prompt(); await deferredInstall.userChoice; deferredInstall = null; document.getElementById('btn-install').classList.add('hidden'); }
+
+    const updateNet = () => document.getElementById('net-badge').classList.toggle('hidden', navigator.onLine);
+    window.addEventListener('online', updateNet); window.addEventListener('offline', updateNet);
+
+    if ('serviceWorker' in navigator) {
+        const hadController = !!navigator.serviceWorker.controller;
+        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+        navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) toast('Versi baru terpasang. Muat ulang untuk memperbarui.', 'info'); });
+    }
+
+    /* ============================================================
+       INISIALISASI
+       ============================================================ */
+    function tick() { document.getElementById('live-clock').textContent = new Date().toLocaleTimeString('en-GB'); }
+    function init() {
+        document.getElementById('side-nama').textContent = db.settings.nama;
+        let tab = 'dashboard';
+        try { tab = localStorage.getItem(APP.slug + '_tab') || 'dashboard'; } catch (e) {}
+        switchTab(tab);
+    }
+    window.addEventListener('DOMContentLoaded', () => {
+        init(); updateNet(); tick(); setInterval(tick, 1000);
+        setTimeout(() => { const s = document.getElementById('splash-screen'); s.classList.add('fade-out'); setTimeout(() => s.style.display = 'none', 500); }, 600);
+    });
+    </script>
+</body>
+</html>
